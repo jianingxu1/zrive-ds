@@ -48,6 +48,20 @@ def get_data_meteo_api(city_name):
     return fetch_url(API_URL, params)
 
 
+def get_mean_and_std_by_year_dataframe(data: dict):
+    df = pd.DataFrame(data)
+
+    # Convert 'time' to datetime
+    df["time"] = pd.to_datetime(df["time"])
+
+    # Extract year and create a new column for it
+    df["year"] = df["time"].dt.year
+
+    # Group by year and calculate mean and standard deviation
+    statistics_per_year = df.groupby("year").agg(["mean", "std"])
+    return statistics_per_year
+
+
 def main():
     city_data = {}
     for city in COORDINATES:
@@ -60,6 +74,13 @@ def main():
                 f"Error {error.response.status_code}: {error.response.reason}."
                 + f"Could not fetch data for {city}."
             )
+
+    # Transform data into dataframes and perform mean and std calculations
+    city_dataframe = {}
+    for city_name in city_data:
+        city_dataframe[city_name] = get_mean_and_std_by_year_dataframe(
+            city_data[city_name]["daily"]
+        )
 
 
 if __name__ == "__main__":
