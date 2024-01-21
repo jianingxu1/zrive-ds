@@ -62,6 +62,26 @@ def get_mean_and_std_by_year_dataframe(data: dict):
     return statistics_per_year
 
 
+def plot_mean_and_std_dataframe(city_name, stat_name, stat_units, stats_df):
+    plt.errorbar(
+        stats_df.index,
+        stats_df["mean"],
+        yerr=stats_df["std"],
+        label=city_name,
+        capsize=1,
+        marker="o",
+        markersize=2,
+        linestyle="-",
+        elinewidth=0.5,
+    )
+    plt.xlabel("Year")
+    plt.ylabel(f"Values in {stat_units}")
+    plt.title(f"Yearly Average and Standard Deviation in {stat_name}")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
 def main():
     city_data = {}
     for city in COORDINATES:
@@ -81,6 +101,14 @@ def main():
         city_dataframe[city_name] = get_mean_and_std_by_year_dataframe(
             city_data[city_name]["daily"]
         )
+
+    # Create a plot for each meteo variable
+    for column in VARIABLES.split(","):
+        for city_name in city_dataframe:
+            plt.figure()
+            units = city_data[city_name]["daily_units"][column]
+            df = city_dataframe[city_name][column]
+            plot_mean_and_std_dataframe(city_name, column, units, df)
 
 
 if __name__ == "__main__":
