@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import time
 import matplotlib.pyplot as plt
+from typing import Dict, Optional, List
 
 API_URL = "https://climate-api.open-meteo.com/v1/climate?"
 
@@ -13,43 +14,64 @@ COORDINATES = {
 
 VARIABLES = "temperature_2m_mean,precipitation_sum,soil_moisture_0_to_10cm_mean"
 
-START_DATE = "1950-01-01"
-END_DATE = "2050-01-01"
 
-MAX_SECONDS_TO_WAIT = 3
-MAX_ATTEMPTS = 5
+def fetch_url(url: str, params: Dict[str, str] = None) -> Optional[Dict]:
+    """
+    Fetch data from an API given a URL and optional parameters.
+    """
+    MAX_SECONDS_TO_WAIT = 1
+    MAX_ATTEMPTS = 5
 
-
-def fetch_url(url, params=None):
-    attempts = 0
-    while attempts < MAX_ATTEMPTS:
-        attempts += 1
-        response = requests.get(url, params)
+    for attempt in range(MAX_ATTEMPTS):
         try:
+            response = requests.get(url, params)
             response.raise_for_status()
+            print("Data fetched successfully!")
             return response.json()
+
         except requests.exceptions.RequestException as error:
-            if error.response.status_code == 429 and attempts < MAX_ATTEMPTS:
-                retry_after = int(response.headers.get("Retry-After", 1))
+            if error.response.status_code == 404:
+                raise
+            elif error.response.status_code == 429 and attempt != MAX_ATTEMPTS - 1:
+                retry_after = int(
+                    response.headers.get("Retry-After", MAX_SECONDS_TO_WAIT)
+                )
                 time.sleep(retry_after)
                 continue
-            raise
+            print(
+                f"""Data fetching unsuccessful. Error {error.response.status_code}: 
+                {error.response.reason}."""
+            )
+            return None
 
 
-def get_data_meteo_api(city_name):
+def fetch_data_meteo_api(
+    latitude: float,
+    longitude: float,
+    start_date: str,
+    end_date: str,
+    climate_models: List[str] = None,
+) -> Optional[Dict]:
+    """
+    Fetch weather data from meteo API given a specified location,
+    time range in "YYYY-MM-DD" format and climate models.
+    """
     params = {
-        "latitude": COORDINATES[city_name]["latitude"],
-        "longitude": COORDINATES[city_name]["longitude"],
+        "latitude": latitude,
+        "longitude": longitude,
         "daily": VARIABLES,
-        "start_date": START_DATE,
-        "end_date": END_DATE,
+        "start_date": start_date,
+        "end_date": end_date,
+        "models": climate_models,
     }
-    # TODO schema validation
+
     return fetch_url(API_URL, params)
 
 
-def get_mean_and_std_by_year_dataframe(data: dict):
-    df = pd.DataFrame(data)
+def compute_yearly_mean_and_std(data: Dict) -> pd.DataFrame:
+    daily_data = data.get("daily", {})
+
+    df = pd.DataFrame(daily_data)
 
     # Convert 'time' to datetime
     df["time"] = pd.to_datetime(df["time"])
@@ -57,58 +79,90 @@ def get_mean_and_std_by_year_dataframe(data: dict):
     # Extract year and create a new column for it
     df["year"] = df["time"].dt.year
 
+    # Delete time column
+    df = df.drop("time", axis=1)
+
     # Group by year and calculate mean and standard deviation
-    statistics_per_year = df.groupby("year").agg(["mean", "std"])
-    return statistics_per_year
+    yearly_mean_and_std_df = df.groupby("year").agg(["mean", "std"])
+
+    return yearly_mean_and_std_df.reset_index()
 
 
-def plot_mean_and_std_dataframe(city_name, stat_name, stat_units, stats_df):
-    plt.errorbar(
-        stats_df.index,
-        stats_df["mean"],
-        yerr=stats_df["std"],
-        label=city_name,
-        capsize=1,
-        marker="o",
-        markersize=2,
-        linestyle="-",
-        elinewidth=0.5,
-    )
+def plot_mean_and_std(
+    climate_models: List[str],
+    parameter: str,
+    city: str,
+    climate_data: Dict,
+    df: pd.DataFrame,
+):
+    plt.figure()
+    plt.style.use("ggplot")
+    plt.subplots(figsize=(10, 6))
+    for model in climate_models:
+        column = f"{parameter}_{model}"
+        plt.errorbar(
+            df["year"],
+            df[column]["mean"],
+            yerr=df[column]["std"],
+            linestyle="-",
+            elinewidth=0.5,
+            marker="o",
+            markersize=2,
+            label=f"{model}",
+            capsize=1,
+        )
+        plt.fill_between(
+            df["year"],
+            df[column]["mean"] - df[column]["std"],
+            df[column]["mean"] + df[column]["std"],
+            alpha=0.3,
+        )
+
+    parameter_unit = climate_data["daily_units"][f"{parameter}_{climate_models[0]}"]
+    parameter_name = parameter.replace("_", " ").capitalize()
     plt.xlabel("Year")
-    plt.ylabel(f"Values in {stat_units}")
-    plt.title(f"Yearly Average and Standard Deviation in {stat_name}")
+    plt.ylabel(f"{parameter_name} ({parameter_unit})")
+    plt.title(
+        "Evolution of the Mean and Standard Deviation of\n "
+        + f"{parameter_name} using different climate models for {city}"
+    )
     plt.legend()
-    plt.grid(True)
+    plt.tight_layout()
     plt.show()
 
 
 def main():
-    city_data = {}
-    for city in COORDINATES:
-        try:
-            response = get_data_meteo_api(city)
-            city_data[city] = response
-            print(f"{city} data fetched successfully!")
-        except requests.exceptions.RequestException as error:
-            print(
-                f"Error {error.response.status_code}: {error.response.reason}."
-                + f"Could not fetch data for {city}."
-            )
+    start_date = "1950-01-01"
+    end_date = "2050-01-01"
+    climate_models = [
+        "CMCC_CM2_VHR4",
+        "FGOALS_f3_H",
+        "HiRAM_SIT_HR",
+        "MRI_AGCM3_2_S",
+        "EC_Earth3P_HR",
+        "MPI_ESM1_2_XR",
+        "NICAM16_8S",
+    ]
+    parameter_to_plot = "temperature_2m_mean"
 
-    # Transform data into dataframes and perform mean and std calculations
-    city_dataframe = {}
-    for city_name in city_data:
-        city_dataframe[city_name] = get_mean_and_std_by_year_dataframe(
-            city_data[city_name]["daily"]
+    city_to_data = {}
+    for city, coordinates in COORDINATES.items():
+        latitude, longitude = coordinates["latitude"], coordinates["longitude"]
+        data = fetch_data_meteo_api(
+            latitude, longitude, start_date, end_date, climate_models
         )
+        if data is None:
+            continue
+        city_to_data[city] = data
 
-    # Create a plot for each meteo variable
-    for column in VARIABLES.split(","):
-        for city_name in city_dataframe:
-            plt.figure()
-            units = city_data[city_name]["daily_units"][column]
-            df = city_dataframe[city_name][column]
-            plot_mean_and_std_dataframe(city_name, column, units, df)
+    city_to_processed_data = {}
+    for city, data in city_to_data.items():
+        city_to_processed_data[city] = compute_yearly_mean_and_std(data)
+
+    for city, processed_data in city_to_processed_data.items():
+        plot_mean_and_std(
+            climate_models, parameter_to_plot, city, city_to_data[city], processed_data
+        )
 
 
 if __name__ == "__main__":
