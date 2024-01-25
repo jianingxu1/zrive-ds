@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 import time
 import matplotlib.pyplot as plt
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 
 API_URL = "https://climate-api.open-meteo.com/v1/climate?"
 
@@ -15,7 +15,7 @@ COORDINATES = {
 VARIABLES = "temperature_2m_mean,precipitation_sum,soil_moisture_0_to_10cm_mean"
 
 
-def fetch_url(url: str, params: Dict[str, str] = None) -> Optional[Dict]:
+def fetch_url(url: str, params: Dict[str, str] = None) -> Optional[Dict[str, Any]]:
     """
     Fetch data from an API given a URL and optional parameters.
     """
@@ -51,7 +51,7 @@ def fetch_data_meteo_api(
     start_date: str,
     end_date: str,
     climate_models: List[str] = None,
-) -> Optional[Dict]:
+) -> Optional[Dict[str, Any]]:
     """
     Fetch weather data from meteo API given a specified location,
     time range in "YYYY-MM-DD" format and climate models.
@@ -68,21 +68,15 @@ def fetch_data_meteo_api(
     return fetch_url(API_URL, params)
 
 
-def compute_yearly_mean_and_std(data: Dict) -> pd.DataFrame:
+def compute_yearly_mean_and_std(data: Dict[str, Any]) -> pd.DataFrame:
     daily_data = data.get("daily", {})
 
     df = pd.DataFrame(daily_data)
 
-    # Convert 'time' to datetime
     df["time"] = pd.to_datetime(df["time"])
-
-    # Extract year and create a new column for it
     df["year"] = df["time"].dt.year
-
-    # Delete time column
     df = df.drop("time", axis=1)
 
-    # Group by year and calculate mean and standard deviation
     yearly_mean_and_std_df = df.groupby("year").agg(["mean", "std"])
 
     return yearly_mean_and_std_df.reset_index()
@@ -92,9 +86,9 @@ def plot_mean_and_std(
     climate_models: List[str],
     parameter: str,
     city: str,
-    climate_data: Dict,
+    climate_data: Dict[str, Any],
     df: pd.DataFrame,
-):
+) -> None:
     plt.figure()
     plt.style.use("ggplot")
     plt.subplots(figsize=(10, 6))
@@ -145,24 +139,19 @@ def main():
     ]
     parameter_to_plot = "temperature_2m_mean"
 
-    city_to_data = {}
     for city, coordinates in COORDINATES.items():
         latitude, longitude = coordinates["latitude"], coordinates["longitude"]
+
         data = fetch_data_meteo_api(
             latitude, longitude, start_date, end_date, climate_models
         )
+
         if data is None:
             continue
-        city_to_data[city] = data
 
-    city_to_processed_data = {}
-    for city, data in city_to_data.items():
-        city_to_processed_data[city] = compute_yearly_mean_and_std(data)
+        processed_data = compute_yearly_mean_and_std(data)
 
-    for city, processed_data in city_to_processed_data.items():
-        plot_mean_and_std(
-            climate_models, parameter_to_plot, city, city_to_data[city], processed_data
-        )
+        plot_mean_and_std(climate_models, parameter_to_plot, city, data, processed_data)
 
 
 if __name__ == "__main__":
