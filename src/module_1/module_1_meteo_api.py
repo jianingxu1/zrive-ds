@@ -2,7 +2,12 @@ import requests
 import pandas as pd
 import time
 import matplotlib.pyplot as plt
+import logging
 from typing import Dict, Optional, List, Any
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 API_URL = "https://climate-api.open-meteo.com/v1/climate?"
 
@@ -19,28 +24,33 @@ def fetch_url(url: str, params: Dict[str, str] = None) -> Optional[Dict[str, Any
     """
     Fetch data from an API given a URL and optional parameters.
     """
-    MAX_ATTEMPTS = 5
+    MAX_ATTEMPTS = 3
     exponential_backoff = 1
     for attempt in range(MAX_ATTEMPTS):
         try:
             response = requests.get(url, params)
             response.raise_for_status()
-            print("Data fetched successfully!")
+            logging.info("Data fetched successfully!")
             return response.json()
 
         except requests.exceptions.RequestException as error:
             if error.response.status_code == 404:
+                logging.error(f"404 Not Found: {url}")
                 raise
             elif error.response.status_code == 429 and attempt != MAX_ATTEMPTS - 1:
                 retry_after = int(
                     response.headers.get("Retry-After", exponential_backoff)
                 )
                 exponential_backoff *= 2
+                logging.warning(
+                    f"Error {error.response.status_code}: {error.response.reason}. "
+                    + f"Retrying after {retry_after} seconds."
+                )
                 time.sleep(retry_after)
                 continue
-            print(
-                f"""Data fetching unsuccessful. Error {error.response.status_code}: 
-                {error.response.reason}."""
+            logging.warning(
+                f"Error {error.response.status_code}: {error.response.reason}. "
+                + "Data fetching unsuccessful."
             )
             return None
 
