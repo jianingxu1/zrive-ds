@@ -19,9 +19,8 @@ def fetch_url(url: str, params: Dict[str, str] = None) -> Optional[Dict[str, Any
     """
     Fetch data from an API given a URL and optional parameters.
     """
-    MAX_SECONDS_TO_WAIT = 1
     MAX_ATTEMPTS = 5
-
+    exponential_backoff = 1
     for attempt in range(MAX_ATTEMPTS):
         try:
             response = requests.get(url, params)
@@ -34,8 +33,9 @@ def fetch_url(url: str, params: Dict[str, str] = None) -> Optional[Dict[str, Any
                 raise
             elif error.response.status_code == 429 and attempt != MAX_ATTEMPTS - 1:
                 retry_after = int(
-                    response.headers.get("Retry-After", MAX_SECONDS_TO_WAIT)
+                    response.headers.get("Retry-After", exponential_backoff)
                 )
+                exponential_backoff *= 2
                 time.sleep(retry_after)
                 continue
             print(
