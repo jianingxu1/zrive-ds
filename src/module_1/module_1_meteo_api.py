@@ -105,7 +105,6 @@ def plot_mean_and_std(
     climate_data: Dict[str, Any],
     df: pd.DataFrame,
 ) -> None:
-    plt.figure()
     plt.style.use("ggplot")
     plt.subplots(figsize=(10, 6))
     for model in climate_models:
