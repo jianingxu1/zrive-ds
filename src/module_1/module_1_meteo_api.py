@@ -3,6 +3,7 @@ import pandas as pd
 import time
 import matplotlib.pyplot as plt
 import logging
+from dataclasses import dataclass
 from typing import Dict, Optional, List, Any
 
 logging.basicConfig(
@@ -55,24 +56,29 @@ def fetch_url(url: str, params: Dict[str, str] = None) -> Optional[Dict[str, Any
             return None
 
 
+@dataclass
+class MeteoApiRequestParameters:
+    latitude: float
+    longitude: float
+    start_date: str
+    end_date: str
+    climate_models: List[str]
+
+
 def fetch_data_meteo_api(
-    latitude: float,
-    longitude: float,
-    start_date: str,
-    end_date: str,
-    climate_models: List[str] = None,
+    requestParams: MeteoApiRequestParameters,
 ) -> Optional[Dict[str, Any]]:
     """
     Fetch weather data from meteo API given a specified location,
     time range in "YYYY-MM-DD" format and climate models.
     """
     params = {
-        "latitude": latitude,
-        "longitude": longitude,
+        "latitude": requestParams.latitude,
+        "longitude": requestParams.longitude,
         "daily": VARIABLES,
-        "start_date": start_date,
-        "end_date": end_date,
-        "models": climate_models,
+        "start_date": requestParams.start_date,
+        "end_date": requestParams.end_date,
+        "models": requestParams.climate_models,
     }
 
     return fetch_url(API_URL, params)
@@ -151,10 +157,14 @@ def main():
 
     for city, coordinates in COORDINATES.items():
         latitude, longitude = coordinates["latitude"], coordinates["longitude"]
-
-        data = fetch_data_meteo_api(
-            latitude, longitude, start_date, end_date, climate_models
+        requestParams = MeteoApiRequestParameters(
+            latitude=latitude,
+            longitude=longitude,
+            start_date=start_date,
+            end_date=end_date,
+            climate_models=climate_models,
         )
+        data = fetch_data_meteo_api(requestParams)
 
         if data is None:
             continue
