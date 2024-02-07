@@ -1,7 +1,10 @@
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+
+plt.style.use("ggplot")
 ```
 
 
@@ -676,58 +679,7 @@ def plot_bar_distribution(df: pd.DataFrame, column: str, title: str):
     plt.xlabel(column)
     plt.ylabel("density")
     plt.show()
-
-
-def plot_hist_distribution(df: pd.DataFrame, column: str, title: str):
-    plt.figure(figsize=(14, 4))
-    df_bought[column].plot(kind="hist", bins=50)
-    plt.title(title)
-    plt.xlabel(column)
-    plt.show()
 ```
-
-
-```python
-plot_bar_distribution(df_bought, "user_order_seq", "Distribution of order sequences")
-```
-
-
-    
-![png](module_2_eda_part_2_files/module_2_eda_part_2_16_0.png)
-    
-
-
-Only second to subsequent orders of users are in this dataset.
-
-
-
-```python
-plot_hist_distribution(
-    df_bought, "normalised_price", "Distribution of product normalised prices"
-)
-```
-
-
-    
-![png](module_2_eda_part_2_files/module_2_eda_part_2_18_0.png)
-    
-
-
-Most of the products sold are in the lower range price.
-
-
-
-```python
-plot_hist_distribution(
-    df_bought, "discount_pct", "Density of product's discount percentages"
-)
-```
-
-
-    
-![png](module_2_eda_part_2_files/module_2_eda_part_2_20_0.png)
-    
-
 
 
 ```python
@@ -745,7 +697,7 @@ df_bought["discount_pct"].plot(
 
 
     
-![png](module_2_eda_part_2_files/module_2_eda_part_2_21_1.png)
+![png](module_2_eda_part_2_files/module_2_eda_part_2_16_1.png)
     
 
 
@@ -780,36 +732,8 @@ promotion?
 We should ask about if >100% discounts are possible. If not, remove them.
 
 
-
-```python
-plot_hist_distribution(
-    df_bought, "global_popularity", "Global popularity of products in orders"
-)
-```
-
-
-    
-![png](module_2_eda_part_2_files/module_2_eda_part_2_25_0.png)
-    
-
-
 There are a few products that are really popular. Although, it depends on the\
 date also, as global_popularity fluctuates.
-
-
-
-```python
-plot_hist_distribution(df_bought, "count_adults", "")
-```
-
-
-    
-![png](module_2_eda_part_2_files/module_2_eda_part_2_27_0.png)
-    
-
-
-The `count_adults` column probably had missing values that were imputed by\
-the mean.
 
 
 
@@ -821,7 +745,7 @@ plot_bar_distribution(
 
 
     
-![png](module_2_eda_part_2_files/module_2_eda_part_2_29_0.png)
+![png](module_2_eda_part_2_files/module_2_eda_part_2_21_0.png)
     
 
 
@@ -990,7 +914,7 @@ plot_bar_distribution(
 
 
     
-![png](module_2_eda_part_2_files/module_2_eda_part_2_32_0.png)
+![png](module_2_eda_part_2_files/module_2_eda_part_2_24_0.png)
     
 
 
@@ -1003,7 +927,7 @@ plot_bar_distribution(
 
 
     
-![png](module_2_eda_part_2_files/module_2_eda_part_2_33_0.png)
+![png](module_2_eda_part_2_files/module_2_eda_part_2_25_0.png)
     
 
 
@@ -1057,52 +981,209 @@ df_bought.groupby("user_id")["order_id"].nunique().plot(
 
 
     
-![png](module_2_eda_part_2_files/module_2_eda_part_2_37_1.png)
+![png](module_2_eda_part_2_files/module_2_eda_part_2_29_1.png)
     
 
 
-Our primary objective is to identify features that correlate with the product\
-outcome. To achieve this, I have chosen relevant features for calculating this\
-correlation.
+## Analysis
+
+- Which features correlate with a product's outcome?
+- What to take into account if we want to use this dataset to train a model?
+
+
+```python
+df.columns
+```
+
+
+
+
+    Index(['variant_id', 'product_type', 'order_id', 'user_id', 'created_at',
+           'order_date', 'user_order_seq', 'outcome', 'ordered_before',
+           'abandoned_before', 'active_snoozed', 'set_as_regular',
+           'normalised_price', 'discount_pct', 'vendor', 'global_popularity',
+           'count_adults', 'count_children', 'count_babies', 'count_pets',
+           'people_ex_baby', 'days_since_purchase_variant_id',
+           'avg_days_to_buy_variant_id', 'std_days_to_buy_variant_id',
+           'days_since_purchase_product_type', 'avg_days_to_buy_product_type',
+           'std_days_to_buy_product_type'],
+          dtype='object')
+
 
 
 
 ```python
-df_corr = df[
-    [
-        "outcome",
-        "user_order_seq",
-        "ordered_before",
-        "abandoned_before",
-        "set_as_regular",
-        "normalised_price",
-        "discount_pct",
-        "global_popularity",
-        "days_since_purchase_variant_id",
-        "avg_days_to_buy_variant_id",
-        "std_days_to_buy_variant_id",
-        "days_since_purchase_product_type",
-        "avg_days_to_buy_product_type",
-        "std_days_to_buy_product_type",
-        "count_adults",
-    ]
-].corr()
-plt.figure(figsize=(12, 8))
-sns.heatmap(df_corr, annot=True)
-plt.show()
+target_col = "outcome"
+info_cols = ["variant_id", "order_id", "user_id", "created_at", "order_date"]
+
+features_cols = [col for col in df.columns if col not in info_cols + [target_col]]
+categorical_cols = ["product_type", "vendor"]
+binary_cols = ["ordered_before", "abandoned_before", "active_snoozed", "set_as_regular"]
+numerical_cols = [
+    col for col in features_cols if col not in categorical_cols + binary_cols
+]
 ```
 
 
+```python
+df[target_col].value_counts()
+```
+
+
+
+
+    outcome
+    0.0    2847317
+    1.0      33232
+    Name: count, dtype: int64
+
+
+
+
+```python
+for col in binary_cols:
+    print(f"Value count {col}: {df[col].value_counts().to_dict()}")
+    print(f"Mean outcome by {col} value: {df.groupby(col)[target_col].mean().to_dict()}")
+    print()
+```
+
+    Value count ordered_before: {0.0: 2819658, 1.0: 60891}
+    Mean outcome by ordered_before value: {0.0: 0.008223337723936732, 1.0: 0.1649669080816541}
     
-![png](module_2_eda_part_2_files/module_2_eda_part_2_39_0.png)
+    Value count abandoned_before: {0.0: 2878794, 1.0: 1755}
+    Mean outcome by abandoned_before value: {0.0: 0.011106039542947498, 1.0: 0.717948717948718}
+    
+    Value count active_snoozed: {0.0: 2873952, 1.0: 6597}
+    Mean outcome by active_snoozed value: {0.0: 0.011302554809544488, 1.0: 0.1135364559648325}
+    
+    Value count set_as_regular: {0.0: 2870093, 1.0: 10456}
+    Mean outcome by set_as_regular value: {0.0: 0.010668992259135854, 1.0: 0.24971308339709258}
     
 
 
 Observations:
 
-- There is some correlation between a product's `outcome` and the\
-  `ordered_before`, `abandoned_before`, `set_as_regular` and `global_popularity`\
-  and a lower correlation with `user_order_seq`, `days_since_purchase_variant_id` and\
-  `days_since_purchase_product_type` variables.
+- There is correlation between the `binary_cols` and the `outcome` because\
+  the difference between the outcome depending on whether they have value 0.0 or\
+  1.0 is significant.
+- The `abandoned_before` has the highest correlation with the `outcome`.
+- Both the outcome and feature's values are extremely unbalanced.
+
+
+
+```python
+df_corr = df[[target_col] + numerical_cols].corr()
+plt.figure(figsize=(14, 8))
+sns.heatmap(df_corr, annot=True)
+```
+
+
+
+
+    <Axes: >
+
+
+
+
+    
+![png](module_2_eda_part_2_files/module_2_eda_part_2_36_1.png)
+    
+
+
+Observations:
+- There is a high correlation between `outcome` and `global_popularity`.\
+  `days_since_purchase_product_type` variables. Other variables are somehow\
+  correlated with `outcome`.
 - Discounts on products have almost no effect on their `outcome`.
 
+
+
+```python
+ncols = 3
+nrows = int(np.ceil(len(numerical_cols)/ncols))
+fig, axs = plt.subplots(nrows, ncols, figsize=(20, 5*nrows))
+axs = axs.flatten()
+for i, col in enumerate(numerical_cols):
+    sns.kdeplot(df.loc[lambda x: x.outcome == 0, col], label="0", ax=axs[i])
+    sns.kdeplot(df.loc[lambda x: x.outcome == 1, col], label="1", ax=axs[i])
+    axs[i].legend()
+    axs[i].set_title(col)
+plt.tight_layout()
+plt.show()
+```
+
+
+    
+![png](module_2_eda_part_2_files/module_2_eda_part_2_38_0.png)
+    
+
+
+Observations:
+
+- The `count_...` and `days_since_...` columns have extremely pointed shapes.\
+  It is likely that there were lots of missing values and they were imputed with\
+  the median. If we want to train a model, we have to consider the options of\
+  keeping them as they are, or eliminating the columns entirely. If the model\
+  with the columns performs better than the one without them, that means that\
+  there is useful information there.
+
+
+```python
+df[categorical_cols].describe()
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>product_type</th>
+      <th>vendor</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>count</th>
+      <td>2880549</td>
+      <td>2880549</td>
+    </tr>
+    <tr>
+      <th>unique</th>
+      <td>62</td>
+      <td>264</td>
+    </tr>
+    <tr>
+      <th>top</th>
+      <td>tinspackagedfoods</td>
+      <td>biona</td>
+    </tr>
+    <tr>
+      <th>freq</th>
+      <td>226474</td>
+      <td>146828</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+Observations:
+- There are a lot of different values for these categorical features. If we\
+  want train a model, we have to encode them. We can try with frequency encoding.
