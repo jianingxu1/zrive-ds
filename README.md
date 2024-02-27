@@ -11,6 +11,8 @@ Después, una vez estemos en el repositorio de trabajo (tras haber hecho un fork
 
 Una vez asegurada que la versión de python es correcta pasamos a instalar las dependencias iniciales definidas en `pyproject.toml` mediante el comando `poetry install`. Una vez instaladas, si necesitamos añadir una nueva dependencia podemos hacerlo con `poetry add <paquete>`.
 
+Si no se detectan las librerías incluidas con poetry, tenemos que activar el entorno virtual del proyecto mediante `poetry shell`.
+
 Además, para garantizar la estandarización del código utilizamos:
 1. `Black`: formatter no configurable que fuerza que el código tome el mismo formato en todos los proyectos.
 2. `Flake8`: is a code linter. It warns you of syntax errors, possible bugs, stylistic errors, etc.
@@ -72,3 +74,6 @@ Los datos encontraréis disponibles en s3 son:
 
 La primera vez que vayais a trabajar con los datos, debeis descargarlos utilizando python `boto3` o `AWS CLI` y a partir de ahí guardarlos en local para evitar tener que descargarlos cada vez (IMPORTANTE: Se considera una buena práctica no añadir datos a vuestros repositorios de código ya que eso haría el repositorio muy pesado y todas las operaciones de version control muy lentas.)
 
+## Conversión de jupyter notebooks
+Para facilitar la revisión de notebooks, convertir el .ipynb a markdown descargando https://github.com/jupyter/nbconvert y luego,
+utilizando el comando `jupyter nbconvert --to <output format> <input notebook>`.
