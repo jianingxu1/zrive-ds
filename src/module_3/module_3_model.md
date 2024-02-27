@@ -11,7 +11,7 @@ Result:
   training dataset:
   - inverse regularization value c=1e-06
   - features used: "ordered_before", "abandoned_before", "global_popularity",\
-    "set_as_regular", "active_snoozed"
+    "set_as_regular"
   - threshold: 0.01821537339520326 (can be changed depending on business\
     requirements)
 
